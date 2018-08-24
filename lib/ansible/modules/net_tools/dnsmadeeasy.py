@@ -365,6 +365,7 @@ EXAMPLES = '''
 import json
 import hashlib
 import hmac
+import locale
 from time import strftime, gmtime
 
 from ansible.module_utils.basic import AnsibleModule
@@ -411,6 +412,7 @@ class DME2(object):
         return headers
 
     def _get_date(self):
+        locale.setlocale(locale.LC_TIME, 'en_US')
         return strftime("%a, %d %b %Y %H:%M:%S GMT", gmtime())
 
     def _create_hash(self, rightnow):
