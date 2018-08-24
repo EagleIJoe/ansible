@@ -623,35 +623,41 @@ def main():
         new_record["value"] = new_record["value"].split(" ")[3]
 
     # Fetch existing monitor if the A record indicates it should exist and build the new monitor
-    current_monitor = dict()
-    new_monitor = dict()
-    if current_record and current_record['type'] == 'A':
+    if current_record and current_record['type'] in ['A', 'CNAME']:
+        current_monitor = dict()
+        new_monitor = dict()
         current_monitor = DME.getMonitor(current_record['id'])
 
-    # Build the new monitor
-    for i in ['monitor', 'systemDescription', 'protocol', 'port', 'sensitivity', 'maxEmails',
-              'contactList', 'httpFqdn', 'httpFile', 'httpQueryString',
-              'failover', 'autoFailover', 'ip1', 'ip2', 'ip3', 'ip4', 'ip5']:
-        if module.params[i] is not None:
-            if i == 'protocol':
-                # The API requires protocol to be a numeric in the range 1-6
-                new_monitor['protocolId'] = protocols[module.params[i]]
-            elif i == 'sensitivity':
-                # The API requires sensitivity to be a numeric of 8, 5, or 3
-                new_monitor[i] = sensitivities[module.params[i]]
-            elif i == 'contactList':
-                # The module accepts either the name or the id of the contact list
-                contact_list_id = module.params[i]
-                if not contact_list_id.isdigit() and contact_list_id != '':
-                    contact_list = DME.getContactListByName(contact_list_id)
-                    if not contact_list:
-                        module.fail_json(msg="Contact list {} does not exist".format(contact_list_id))
-                    contact_list_id = contact_list.get('id', '')
-                new_monitor['contactListId'] = contact_list_id
-            else:
-                # The module option names match the API field names
-                new_monitor[i] = module.params[i]
+        # Build the new monitor
+        for i in ['monitor', 'systemDescription', 'protocol', 'port', 'sensitivity', 'maxEmails',
+                'contactList', 'httpFqdn', 'httpFile', 'httpQueryString',
+                'failover', 'autoFailover', 'ip1', 'ip2', 'ip3', 'ip4', 'ip5']:
+            if module.params[i] is not None:
+                if i == 'protocol':
+                    # The API requires protocol to be a numeric in the range 1-6
+                    new_monitor['protocolId'] = protocols[module.params[i]]
+                elif i == 'sensitivity':
+                    # The API requires sensitivity to be a numeric of 8, 5, or 3
+                    new_monitor[i] = sensitivities[module.params[i]]
+                elif i == 'contactList':
+                    # The module accepts either the name or the id of the contact list
+                    contact_list_id = module.params[i]
+                    if not contact_list_id.isdigit() and contact_list_id != '':
+                        contact_list = DME.getContactListByName(contact_list_id)
+                        if not contact_list:
+                            module.fail_json(msg="Contact list {} does not exist".format(contact_list_id))
+                        contact_list_id = contact_list.get('id', '')
+                    new_monitor['contactListId'] = contact_list_id
+                else:
+                    # The module option names match the API field names
+                    new_monitor[i] = module.params[i]
 
+        monitor_changed = False
+        if current_monitor:
+            for i in new_monitor:
+                if str(current_monitor.get(i)) != str(new_monitor[i]):
+                    monitor_changed = True
+    
     # Compare new record against existing one
     record_changed = False
     if current_record:
@@ -660,11 +666,7 @@ def main():
                 record_changed = True
         new_record['id'] = str(current_record['id'])
 
-    monitor_changed = False
-    if current_monitor:
-        for i in new_monitor:
-            if str(current_monitor.get(i)) != str(new_monitor[i]):
-                monitor_changed = True
+
 
     # Follow Keyword Controlled Behavior
     if state == 'present':
@@ -678,7 +680,9 @@ def main():
         # create record and monitor as the record does not exist
         if not current_record:
             record = DME.createRecord(DME.prepareRecord(new_record))
-            monitor = DME.updateMonitor(record['id'], DME.prepareMonitor(new_monitor))
+            monitor = dict()
+            if new_monitor in locals():
+                monitor = DME.updateMonitor(record['id'], DME.prepareMonitor(new_monitor))
             module.exit_json(changed=True, result=dict(record=record, monitor=monitor))
 
         # update the record
