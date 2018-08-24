@@ -623,9 +623,10 @@ def main():
         new_record["value"] = new_record["value"].split(" ")[3]
 
     # Fetch existing monitor if the A record indicates it should exist and build the new monitor
+    monitor_changed = False
+    current_monitor = dict()
+    new_monitor = dict()
     if current_record and current_record['type'] in ['A', 'CNAME']:
-        current_monitor = dict()
-        new_monitor = dict()
         current_monitor = DME.getMonitor(current_record['id'])
 
         # Build the new monitor
@@ -652,7 +653,6 @@ def main():
                     # The module option names match the API field names
                     new_monitor[i] = module.params[i]
 
-        monitor_changed = False
         if current_monitor:
             for i in new_monitor:
                 if str(current_monitor.get(i)) != str(new_monitor[i]):
@@ -681,7 +681,7 @@ def main():
         if not current_record:
             record = DME.createRecord(DME.prepareRecord(new_record))
             monitor = dict()
-            if new_monitor in locals():
+            if len(new_monitor) > 0:
                 monitor = DME.updateMonitor(record['id'], DME.prepareMonitor(new_monitor))
             module.exit_json(changed=True, result=dict(record=record, monitor=monitor))
 
